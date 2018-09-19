@@ -8,6 +8,8 @@ Original script by louwrentius@gmail.com
 Modified to add a cleanup function to remove routes added by the script on startup.
 The cleanup function (called wfs_stop) only works with deamon mode.
 
+Added loss threshold in checks logic.
+Added route checks from @GWuk fork.
 
 Design
 ======
@@ -132,6 +134,11 @@ failover is performed. In this example, the failover test must fail three times 
 a failover is committed. Based on the interval used in the previous example, a failover will
 take about a minute after the connection has gone bad. By changing the values, you can
 switch faster or slower.
+
+
+THRESHOLD_PACKETS_LOSS=20
+
+Threshold (in %) above which the target check will treat as fail.
 
 COOLDOWNDELAY=120
 

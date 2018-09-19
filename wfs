@@ -7,7 +7,7 @@
 # Licence = GNU GPL
 #
 
-VERSION=2.05
+VERSION=2.06
 
 CONFIG=/etc/wfs
 CONFIG_FILE="$CONFIG/wfs.conf"
@@ -21,8 +21,9 @@ else
     SECONDARY_GW=192.168.1.1
     MAX_LATENCY=1
     INTERVAL=20
-    TEST_COUNT=2
+    TEST_COUNT=10
     THRESHOLD=3
+    THRESHOLD_PACKETS_LOSS=10
     COOLDOWNDELAY=20
     TTL=""
     COOLDOWNDELAY01=3600
@@ -104,6 +105,42 @@ log2syslog () {
     echo "$MSG" | logger -t "WFS" -p daemon."$TYPE"
 }
 
+
+remove_target_routes () {
+    for x in $TARGETS
+    do
+        log DEBUG "Removing static route for host $x"
+        route del -host "$x" >> /dev/null 2>&1
+    done
+}
+
+
+#
+# This route allows testing if the failed primary link
+# Is available again, when in failover mode.
+#
+add_target_routes () {
+    # cleanup routes before, sometimes something is left over
+    remove_target_routes
+
+    # add routes
+    for x in $TARGETS
+    do
+      log DEBUG "Adding static route for host $x"
+      ROUTE_ADDED=-1
+      while [ $ROUTE_ADDED -ne "0" ]
+      do
+        route add -host "$x" gw "$PRIMARY_GW" >> /dev/null 2>&1
+        ROUTE_ADDED=$?
+        if [ $ROUTE_ADDED -ne "0" ]
+        then
+          log ERROR "failed to route add -host $x gw $PRIMARY_GW, retrying in $INTERVAL seconds"
+          sleep $INTERVAL
+        fi
+      done
+    done
+}
+
 init_wfs () {
 
     if [ ! -e "$TARGETS_FILE" ]
@@ -121,11 +158,7 @@ init_wfs () {
         log ERROR "No targets to test availability, targets file $TARGETS_FILE empty?."
         exit 1
     else
-        for x in $TARGETS
-        do
-            log DEBUG "Adding static route for host $x"
-            route add -host "$x" gw "$PRIMARY_GW" >> /dev/null 2>&1
-        done
+        add_target_routes
     fi
 }
 
@@ -151,29 +184,34 @@ display_header () {
     log INFO "------------------------------"
     log INFO " Primary gateway: $PRIMARY_GW"
     log INFO " Secondary gateway: $SECONDARY_GW"
-    log INFO " Max latency in ms: $MAX_LATENCY"
+    log INFO " Max latency in s: $MAX_LATENCY"
     log INFO " Threshold before failover: $THRESHOLD"
+    log INFO " Threshold for packets loss: $THRESHOLD_PACKETS_LOSS%"
     log INFO " Number of target hosts: $NO_OF_TARGETS"
     log INFO " Tests per host: $TEST_COUNT"
     log INFO "------------------------------"
 }
 
-
-#
-# This route allows testing if the failed primary link
-# Is available again, when in failover mode.
-#
-
+check_route () {
+    TARGET="$1"
+    log DEBUG "checking route to $TARGET"
+    (ip route 2>&1 | grep "^$TARGET via $PRIMARY_GW") >> /dev/null 2>&1
+    if [ ! "$?" = "0" ]
+    then
+        log INFO "recreating routes ($TARGET via $PRIMARY_GW missing)"
+        add_target_routes
+    fi
+}
 
 test_single_target () {
 
     TARGET="$1"
-    log DEBUG "Test interval between hosts is $TEST_INTERVAL"
-
-    ping -W "$MAX_LATENCY" -c "$TEST_COUNT" "$TARGET" >> /dev/null 2>&1
-    if [ ! "$?" = "0" ]
+    check_route $TARGET
+    log DEBUG "Test interval between hosts is $TEST_INTERVAL sec"
+    loss="$(ping -W "$MAX_LATENCY" -c "$TEST_COUNT" -i 0.3 "$TARGET" | grep -oP '\d+(?=% packet loss)')"
+    if [[ $loss -gt $THRESHOLD_PACKETS_LOSS ]]
     then
-        log INFO "Host $TARGET UNREACHABLE"
+        log INFO "Host $TARGET UNREACHABLE, pckt loss: $loss%, threshold: $THRESHOLD_PACKETS_LOSS%"
 
         if [ "$TARGETS_FAILED" -lt "$THRESHOLD" ]
         then
@@ -186,7 +224,7 @@ test_single_target () {
             ((TARGETS_FAILED--))
         fi
 
-        log DEBUG "Host $TARGET OK"
+        log DEBUG "Host $TARGET OK, pckt loss: $loss%, threshold: $THRESHOLD_PACKETS_LOSS%"
         if [ "$ACTIVE_CONNECTION" = "PRIMARY" ]
         then
             TEST_INTERVAL="$INTERVAL"
@@ -300,11 +338,7 @@ stop_wfs () {
 
     if [ ! -z "$TARGETS" ]
     then
-        for x in $TARGETS
-        do
-            log DEBUG "Removing static route for host $x"
-            route del -host "$x" gw "$PRIMARY_GW" >> /dev/null 2>&1
-        done
+        remove_target_routes
     fi
 
     exit 0
