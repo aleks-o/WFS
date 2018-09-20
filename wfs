@@ -16,6 +16,7 @@ if [ -e "$CONFIG_FILE" ]
 then
     . $CONFIG_FILE
 else
+    ROUTER_ID=""
     TARGETS_FILE="$CONFIG/targets.txt"
     PRIMARY_GW=10.0.0.1
     SECONDARY_GW=192.168.1.1
@@ -92,7 +93,7 @@ log2mail () {
 
     SUBJECT="$1"
     BODY="$2"
-    DATE=`date +%b\ %d\ %H:%M:%S`
+    DATE=`date "+%Y-%m-%d %H:%M:%S %:z"`
     if [ ! -z "$MAIL_TARGET" ]
     then
         echo "$DATE - $BODY" | mail -s "$SUBJECT" "$MAIL_TARGET" &
@@ -111,10 +112,20 @@ log2telegram () {
 
   if [ ! -z "$T_CHAT" ]
   then
-    DATE=`date +%b\ %d\ %H:%M:%S`
+   DATE=`date "+%Y-%m-%d %H:%M:%S %:z"`
+
+template=$(cat <<TEMPLATE
+<strong>$ROUTER_ID:</strong> $1
+Date/Time: $DATE
+<pre>
+$2
+</pre>
+TEMPLATE
+)
+
     curl --connect-timeout 5 --silent --output /dev/null \
       --data-urlencode "chat_id=$T_CHAT" \
-      --data-urlencode "text=$DATE\n<b>$ROUTER_ID:</b> $1" \
+      --data-urlencode "text=${template}" \
       --data-urlencode "parse_mode=HTML" \
       --data-urlencode "disable_web_page_preview=true" \
       "https://api.telegram.org/bot$T_TOKEN/sendMessage"
@@ -309,9 +320,9 @@ switch () {
         fi
     sleep "5"
     MSG="Primary WAN link failed. Switched to secondary link."
-    BODY=`route -n`
+    BODY=`ip r`
     log2mail "$MSG" "$BODY"
-    log2telegram "$MSG"
+    log2telegram "$MSG" "$BODY"
     log INFO "$MSG"
     log DEBUG "Failover Cooldown started, sleeping for $COOLDOWNDELAY01 seconds."
     sleep "$COOLDOWNDELAY01"
@@ -325,9 +336,9 @@ switch () {
         fi
     sleep "10"
     MSG="Primary WAN link OK. Switched back to primary link."
-    BODY=`route -n`
+    BODY=`ip r`
     log2mail "$MSG" "$BODY"
-    log2telegram "$MSG"
+    log2telegram "$MSG" "$BODY"
     log INFO "$MSG"
     log DEBUG "Failback Cooldown started, sleeping for $COOLDOWNDELAY02 seconds."
     sleep "$COOLDOWNDELAY02"
