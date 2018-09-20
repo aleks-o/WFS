@@ -22,13 +22,15 @@ else
     MAX_LATENCY=1
     INTERVAL=20
     TEST_COUNT=10
-    THRESHOLD=3
-    THRESHOLD_PACKETS_LOSS=10
+    THRESHOLD=10
+    THRESHOLD_PACKETS_LOSS=20
     COOLDOWNDELAY=20
     TTL=""
-    COOLDOWNDELAY01=3600
-    COOLDOWNDELAY02=600
+    COOLDOWNDELAY01=36
+    COOLDOWNDELAY02=60
     MAIL_TARGET=""
+    T_TOKEN=""
+    T_CHAT=""
     DAEMON=1
     QUIET=0
     PIDFILE=/var/run/wfs.pid
@@ -103,6 +105,20 @@ log2syslog () {
     MSG="$2"
 
     echo "$MSG" | logger -t "WFS" -p daemon."$TYPE"
+}
+
+log2telegram () {
+
+  if [ ! -z "$T_CHAT" ]
+  then
+    DATE=`date +%b\ %d\ %H:%M:%S`
+    curl --connect-timeout 5 --silent --output /dev/null \
+      --data-urlencode "chat_id=$T_CHAT" \
+      --data-urlencode "text=$DATE\n<b>$ROUTER_ID:</b> $1" \
+      --data-urlencode "parse_mode=HTML" \
+      --data-urlencode "disable_web_page_preview=true" \
+      "https://api.telegram.org/bot$T_TOKEN/sendMessage"
+  fi
 }
 
 
@@ -295,6 +311,7 @@ switch () {
     MSG="Primary WAN link failed. Switched to secondary link."
     BODY=`route -n`
     log2mail "$MSG" "$BODY"
+    log2telegram "$MSG"
     log INFO "$MSG"
     log DEBUG "Failover Cooldown started, sleeping for $COOLDOWNDELAY01 seconds."
     sleep "$COOLDOWNDELAY01"
@@ -310,6 +327,7 @@ switch () {
     MSG="Primary WAN link OK. Switched back to primary link."
     BODY=`route -n`
     log2mail "$MSG" "$BODY"
+    log2telegram "$MSG"
     log INFO "$MSG"
     log DEBUG "Failback Cooldown started, sleeping for $COOLDOWNDELAY02 seconds."
     sleep "$COOLDOWNDELAY02"

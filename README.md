@@ -10,6 +10,7 @@ The cleanup function (called wfs_stop) only works with deamon mode.
 
 Added loss threshold in checks logic.
 Added route checks from @GWuk fork.
+Added telegram notifications.
 
 Design
 ======

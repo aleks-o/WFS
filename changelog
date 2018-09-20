@@ -1,3 +1,8 @@
+Version 2.06
+    * Added loss threshold in checks logic.
+    * Added route checks from @GWuk fork.
+    * Added telegram notifications.
+
 Version 2.05
     * MAX_LATENCY is specified in seconds, ping in ubuntu does not allow timeouts
       below 1 second.
