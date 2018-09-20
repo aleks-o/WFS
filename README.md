@@ -307,3 +307,4 @@ Example of debug output:
     Sep 20 08:06:09 localhost.localdomain WFS[31675]: DEBUG Test interval between hosts is 20 sec
     Sep 20 08:06:12 localhost.localdomain WFS[31684]: DEBUG Host 1.1.1.1 OK, pckt loss: 0%, threshold: 20%
     Sep 20 08:06:12 localhost.localdomain WFS[31690]: INFO WAN Link: PRIMARY
+
