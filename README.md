@@ -9,7 +9,9 @@ Modified to add a cleanup function to remove routes added by the script on start
 The cleanup function (called wfs_stop) only works with deamon mode.
 
 Added loss threshold in checks logic.
+
 Added route checks from @GWuk fork.
+
 Added telegram notifications.
 
 Design
@@ -32,6 +34,14 @@ default gateway.
   * apt-get install mailutils postfix (installs mail and a local MTA)
   * configure postfix as an internet gateway
   * do not forward an inbound mail to this instance, it should be behind a firewall and for outbound notification traffic only.
+
+## For telergam notifications
+
+  * create bot and get your token from @BotFather
+  * send any message to the bot
+  * check chat_id with curl https://api.telegram.org/botYOURTOKENHERE/getUpdates
+  * add T_TOKEN and T_CHAT variables to wfs.conf
+  * leave T_CHAT empty to disable telegram notifications
 
 ## Assumption
 
@@ -115,6 +125,10 @@ Contents of /etc/wfs/targets.txt:
 These are the hosts that are used to test if the primary WAN interface is available. Please
 note that this is an example.
 
+ROUTER_ID="test-router"
+
+Just name of your router.
+
 PRIMARY_GW=10.0.0.1
 SECONDARY_GW=192.168.0.1
 
@@ -136,10 +150,9 @@ a failover is committed. Based on the interval used in the previous example, a f
 take about a minute after the connection has gone bad. By changing the values, you can
 switch faster or slower.
 
-
 THRESHOLD_PACKETS_LOSS=20
 
-Threshold (in %) above which the target check will treat as fail.
+Threshold (in %) above which the target's checks will treat as fail.
 
 COOLDOWNDELAY=120
 
@@ -189,6 +202,14 @@ The maximum allowed latency on an ICMP ping request before the request is consid
 failed.  This allows us to failover in the even of a severely degraded connection which is
 still live but running very slowly.
 
+T_TOKEN="12334567890:KJNIYUYTVIJOPMIJVTRCRECUNIUN"
+
+Your telegram bot's token.
+
+T_CHAT="1234567890"
+
+Telegram chat_id to send messages. Leave it empty to disable telegram notifications.
+
 ## Logging
 
 Log messages are sent to /var/log/daemon or /var/log/messages.
@@ -197,42 +218,92 @@ Logging can be more verbose by configuring the 'DEBUG' option within the configu
 
 Example of debug output:
 
-    May 29 21:47:08 server WFS: INFO ------------------------------
-    May 29 21:47:08 server WFS: INFO  WAN Failover Script 2.0
-    May 29 21:47:08 server WFS: INFO ------------------------------
-    May 29 21:47:08 server WFS: INFO  Primary gateway: 10.0.0.1
-    May 29 21:47:08 server WFS: INFO  Secondary gateway: 10.0.0.1
-    May 29 21:47:08 server WFS: INFO  Threshold before failover: 3
-    May 29 21:47:08 server WFS: INFO  Number of target hosts: 4
-    May 29 21:47:08 server WFS: INFO  Tests per host: 2
-    May 29 21:47:08 server WFS: INFO ------------------------------
-    May 29 21:47:08 server WFS: INFO Starting monitoring of WAN link.
-    May 29 21:47:09 server WFS: INFO WAN Link: PRIMARY
-    May 29 21:47:30 server WFS: INFO Host 74.125.77.104 UNREACHABLE
-    May 29 21:47:30 server WFS: INFO Failed targets is 1, threshold is 3.
-    May 29 21:47:30 server WFS: INFO WAN Link: PRIMARY
-    May 29 21:47:36 server WFS: INFO Host 69.147.125.65 UNREACHABLE
-    May 29 21:47:36 server WFS: INFO Failed targets is 2, threshold is 3.
-    May 29 21:47:36 server WFS: INFO WAN Link: PRIMARY
-    May 29 21:47:42 server WFS: INFO Host 98.137.149.56 UNREACHABLE
-    May 29 21:47:42 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:47:42 server WFS: INFO Primary WAN link failed. Switched to secondary link.
-    May 29 21:48:18 server WFS: INFO Host 209.85.227.105 UNREACHABLE
-    May 29 21:48:18 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:24 server WFS: INFO Host 74.125.77.104 UNREACHABLE
-    May 29 21:48:24 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:30 server WFS: INFO Host 69.147.125.65 UNREACHABLE
-    May 29 21:48:30 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:36 server WFS: INFO Host 98.137.149.56 UNREACHABLE
-    May 29 21:48:36 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:42 server WFS: INFO Host 209.85.227.105 UNREACHABLE
-    May 29 21:48:42 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:48 server WFS: INFO Host 74.125.77.104 UNREACHABLE
-    May 29 21:48:48 server WFS: INFO Failed targets is 3, threshold is 3.
-    May 29 21:48:54 server WFS: INFO Failed targets is 2, threshold is 3.
-    May 29 21:49:01 server WFS: INFO Failed targets is 1, threshold is 3.
-    May 29 21:49:07 server WFS: INFO Primary WAN link OK. Switched back to primary link.
-    May 29 21:49:43 server WFS: INFO WAN Link: PRIMARY
-    May 29 21:50:04 server WFS: INFO WAN Link: PRIMARY
-    May 29 21:50:25 server WFS: INFO WAN Link: PRIMARY
-
+    Sep 20 08:01:57 localhost.localdomain WFS[30945]: DEBUG Removing static route for host 1.1.1.1
+    Sep 20 08:01:57 localhost.localdomain WFS[30952]: DEBUG Removing static route for host 9.9.9.9
+    Sep 20 08:01:57 localhost.localdomain WFS[30959]: DEBUG Adding static route for host 1.1.1.1
+    Sep 20 08:01:57 localhost.localdomain WFS[30966]: DEBUG Adding static route for host 9.9.9.9
+    Sep 20 08:01:57 localhost.localdomain WFS[30973]: INFO ------------------------------
+    Sep 20 08:01:57 localhost.localdomain WFS[30979]: INFO  WAN Failover Script 2.06
+    Sep 20 08:01:57 localhost.localdomain WFS[30985]: INFO ------------------------------
+    Sep 20 08:01:57 localhost.localdomain WFS[30991]: INFO  Primary gateway: 192.168.122.2
+    Sep 20 08:01:57 localhost.localdomain WFS[30997]: INFO  Secondary gateway: 192.168.122.1
+    Sep 20 08:01:57 localhost.localdomain WFS[31003]: INFO  Max latency in s: 1
+    Sep 20 08:01:57 localhost.localdomain WFS[31009]: INFO  Threshold before failover: 3
+    Sep 20 08:01:57 localhost.localdomain WFS[31015]: INFO  Threshold for packets loss: 20%
+    Sep 20 08:01:57 localhost.localdomain WFS[31021]: INFO  Number of target hosts: 2
+    Sep 20 08:01:57 localhost.localdomain WFS[31027]: INFO  Tests per host: 10
+    Sep 20 08:01:57 localhost.localdomain WFS[31033]: INFO ------------------------------
+    Sep 20 08:01:57 localhost.localdomain WFS[31039]: INFO Starting monitoring of WAN link.
+    Sep 20 08:01:57 localhost.localdomain WFS[31045]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:01:57 localhost.localdomain WFS[31054]: DEBUG Test interval between hosts is 20 sec
+    Sep 20 08:02:00 localhost.localdomain WFS[31064]: DEBUG Host 1.1.1.1 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:02:00 localhost.localdomain WFS[31070]: INFO WAN Link: PRIMARY
+    Sep 20 08:02:20 localhost.localdomain WFS[31077]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:02:20 localhost.localdomain WFS[31086]: DEBUG Test interval between hosts is 20 sec
+    Sep 20 08:02:23 localhost.localdomain WFS[31095]: DEBUG Host 9.9.9.9 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:02:23 localhost.localdomain WFS[31101]: INFO WAN Link: PRIMARY
+    Sep 20 08:02:43 localhost.localdomain WFS[31108]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:02:43 localhost.localdomain WFS[31117]: DEBUG Test interval between hosts is 20 sec
+    Sep 20 08:02:46 localhost.localdomain WFS[31126]: INFO Host 1.1.1.1 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:02:46 localhost.localdomain WFS[31132]: INFO Failed targets is 1, threshold is 3.
+    Sep 20 08:02:46 localhost.localdomain WFS[31138]: INFO WAN Link: PRIMARY
+    Sep 20 08:02:47 localhost.localdomain WFS[31145]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:02:47 localhost.localdomain WFS[31154]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:02:50 localhost.localdomain WFS[31163]: INFO Host 9.9.9.9 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:02:50 localhost.localdomain WFS[31169]: INFO Failed targets is 2, threshold is 3.
+    Sep 20 08:02:50 localhost.localdomain WFS[31175]: INFO WAN Link: PRIMARY
+    Sep 20 08:02:51 localhost.localdomain WFS[31183]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:02:51 localhost.localdomain WFS[31192]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:02:54 localhost.localdomain WFS[31201]: INFO Host 1.1.1.1 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:02:54 localhost.localdomain WFS[31207]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:00 localhost.localdomain WFS[31257]: INFO Primary WAN link failed. Switched to secondary link.
+    Sep 20 08:03:00 localhost.localdomain WFS[31263]: DEBUG Failover Cooldown started, sleeping for 36 seconds.
+    Sep 20 08:03:37 localhost.localdomain WFS[31271]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:03:37 localhost.localdomain WFS[31280]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:03:40 localhost.localdomain WFS[31289]: INFO Host 9.9.9.9 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:03:40 localhost.localdomain WFS[31295]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:41 localhost.localdomain WFS[31302]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:03:41 localhost.localdomain WFS[31311]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:03:44 localhost.localdomain WFS[31320]: INFO Host 1.1.1.1 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:03:44 localhost.localdomain WFS[31326]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:45 localhost.localdomain WFS[31333]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:03:45 localhost.localdomain WFS[31342]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:03:48 localhost.localdomain WFS[31351]: INFO Host 9.9.9.9 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:03:48 localhost.localdomain WFS[31357]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:49 localhost.localdomain WFS[31364]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:03:49 localhost.localdomain WFS[31373]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:03:52 localhost.localdomain WFS[31382]: INFO Host 1.1.1.1 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:03:52 localhost.localdomain WFS[31388]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:53 localhost.localdomain WFS[31395]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:03:53 localhost.localdomain WFS[31404]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:03:56 localhost.localdomain WFS[31413]: INFO Host 9.9.9.9 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:03:56 localhost.localdomain WFS[31419]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:03:57 localhost.localdomain WFS[31426]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:03:57 localhost.localdomain WFS[31435]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:04:00 localhost.localdomain WFS[31444]: INFO Host 1.1.1.1 UNREACHABLE, pckt loss: 100%, threshold: 20%
+    Sep 20 08:04:00 localhost.localdomain WFS[31450]: INFO Failed targets is 3, threshold is 3.
+    Sep 20 08:04:01 localhost.localdomain WFS[31457]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:04:01 localhost.localdomain WFS[31466]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:04:04 localhost.localdomain WFS[31475]: DEBUG Host 9.9.9.9 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:04:04 localhost.localdomain WFS[31481]: INFO Failed targets is 2, threshold is 3.
+    Sep 20 08:04:05 localhost.localdomain WFS[31488]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:04:05 localhost.localdomain WFS[31497]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:04:08 localhost.localdomain WFS[31506]: DEBUG Host 1.1.1.1 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:04:08 localhost.localdomain WFS[31512]: INFO Failed targets is 1, threshold is 3.
+    Sep 20 08:04:09 localhost.localdomain WFS[31519]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:04:09 localhost.localdomain WFS[31528]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:04:12 localhost.localdomain WFS[31537]: DEBUG Host 9.9.9.9 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:04:22 localhost.localdomain WFS[31587]: INFO Primary WAN link OK. Switched back to primary link.
+    Sep 20 08:04:22 localhost.localdomain WFS[31593]: DEBUG Failback Cooldown started, sleeping for 60 seconds.
+    Sep 20 08:05:23 localhost.localdomain WFS[31603]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:05:23 localhost.localdomain WFS[31612]: DEBUG Test interval between hosts is 1 sec
+    Sep 20 08:05:26 localhost.localdomain WFS[31621]: DEBUG Host 1.1.1.1 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:05:26 localhost.localdomain WFS[31627]: INFO WAN Link: PRIMARY
+    Sep 20 08:05:46 localhost.localdomain WFS[31634]: DEBUG checking route to 9.9.9.9
+    Sep 20 08:05:46 localhost.localdomain WFS[31643]: DEBUG Test interval between hosts is 20 sec
+    Sep 20 08:05:49 localhost.localdomain WFS[31652]: DEBUG Host 9.9.9.9 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:05:49 localhost.localdomain WFS[31658]: INFO WAN Link: PRIMARY
+    Sep 20 08:06:09 localhost.localdomain WFS[31666]: DEBUG checking route to 1.1.1.1
+    Sep 20 08:06:09 localhost.localdomain WFS[31675]: DEBUG Test interval between hosts is 20 sec
+    Sep 20 08:06:12 localhost.localdomain WFS[31684]: DEBUG Host 1.1.1.1 OK, pckt loss: 0%, threshold: 20%
+    Sep 20 08:06:12 localhost.localdomain WFS[31690]: INFO WAN Link: PRIMARY
