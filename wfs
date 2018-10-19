@@ -186,6 +186,16 @@ init_wfs () {
         exit 1
     else
         add_target_routes
+        # remove default route
+        route del default
+        # add primary default route
+        switch_to_primary
+        # run pri cmd
+        if [ ! -z "$PRIMARY_CMD" ]
+        then
+            eval "$PRIMARY_CMD"
+        fi
+        sleep 2
     fi
 }
 
