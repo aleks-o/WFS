@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 BINARY=wfs
 CONFIG=wfs.conf
